@@ -1,23 +1,23 @@
-# Container-first claw-code workflows
+# 以容器为优先的 claw-code 工作流
 
-This repo already had **container detection** in the Rust runtime before this document was added:
+在添加本文档之前，这个仓库的 Rust 运行时已经具备了**容器检测**能力：
 
-- `rust/crates/runtime/src/sandbox.rs` detects Docker/Podman/container markers such as `/.dockerenv`, `/run/.containerenv`, matching env vars, and `/proc/1/cgroup` hints.
-- `rust/crates/rusty-claude-cli/src/main.rs` exposes that state through the `claw sandbox` / `cargo run -p rusty-claude-cli -- sandbox` report.
-- `.github/workflows/rust-ci.yml` runs on `ubuntu-latest`, but it does **not** define a Docker or Podman container job.
-- Before this change, the repo did **not** have a checked-in `Dockerfile`, `Containerfile`, or `.devcontainer/` config.
+- `rust/crates/runtime/src/sandbox.rs` 会检测 Docker/Podman/容器相关标记，例如 `/.dockerenv`、`/run/.containerenv`、匹配的环境变量，以及 `/proc/1/cgroup` 中的线索。
+- `rust/crates/rusty-claude-cli/src/main.rs` 会通过 `claw sandbox` / `cargo run -p rusty-claude-cli -- sandbox` 报告暴露该状态。
+- `.github/workflows/rust-ci.yml` 在 `ubuntu-latest` 上运行，但**没有**定义 Docker 或 Podman 容器任务。
+- 在这次变更之前，仓库中**没有**纳入版本控制的 `Dockerfile`、`Containerfile` 或 `.devcontainer/` 配置。
 
-This document adds a small checked-in `Containerfile` so Docker and Podman users have one canonical container workflow.
+本文档新增了一个小型、纳入版本控制的 `Containerfile`，让 Docker 和 Podman 用户都有一套统一的容器工作流可用。
 
-## What the checked-in container image is for
+## 仓库内置容器镜像的用途
 
-The root [`../Containerfile`](../Containerfile) gives you a reusable Rust build/test shell with the extra packages this workspace commonly needs (`git`, `pkg-config`, `libssl-dev`, certificates).
+根目录下的 [`../Containerfile`](../Containerfile) 提供了一个可复用的 Rust 构建/测试环境，并预装了该工作区常用的额外软件包（`git`、`pkg-config`、`libssl-dev`、证书）。
 
-It does **not** copy the repository into the image. Instead, the recommended flow is to bind-mount your checkout into `/workspace` so edits stay on the host.
+它**不会**把仓库内容复制进镜像。相反，推荐的方式是将你的检出目录以 bind mount 的形式挂载到 `/workspace`，这样编辑仍然保留在宿主机上。
 
-## Build the image
+## 构建镜像
 
-From the repository root:
+在仓库根目录执行：
 
 ### Docker
 
@@ -31,9 +31,9 @@ docker build -t claw-code-dev -f Containerfile .
 podman build -t claw-code-dev -f Containerfile .
 ```
 
-## Run `cargo test --workspace` in the container
+## 在容器中运行 `cargo test --workspace`
 
-These commands mount the repo, keep Cargo build artifacts out of the working tree, and run from the Rust workspace at `rust/`.
+下面这些命令会挂载仓库、避免 Cargo 构建产物落到工作树中，并从位于 `rust/` 的 Rust 工作区运行。
 
 ### Docker
 
@@ -57,9 +57,9 @@ podman run --rm -it \
   cargo test --workspace
 ```
 
-If you want a fully clean rebuild, add `cargo clean &&` before `cargo test --workspace`.
+如果你想执行一次完全干净的重建，可以在 `cargo test --workspace` 前加上 `cargo clean &&`。
 
-## Open a shell in the container
+## 在容器中打开一个 shell
 
 ### Docker
 
@@ -81,7 +81,7 @@ podman run --rm -it \
   claw-code-dev
 ```
 
-Inside the shell:
+在 shell 中：
 
 ```bash
 cargo build --workspace
@@ -90,11 +90,11 @@ cargo run -p rusty-claude-cli -- --help
 cargo run -p rusty-claude-cli -- sandbox
 ```
 
-The `sandbox` command is a useful sanity check: inside Docker or Podman it should report `In container true` and list the markers the runtime detected.
+`sandbox` 命令是一个很实用的健全性检查：在 Docker 或 Podman 内部，它应该报告 `In container true`，并列出运行时检测到的标记。
 
-## Bind-mount this repo and another repo at the same time
+## 同时 bind mount 本仓库和另一个仓库
 
-If you want to run `claw` against a second checkout while keeping `claw-code` itself mounted read-write:
+如果你想在保持 `claw-code` 自身以读写方式挂载的同时，让 `claw` 针对第二个检出目录运行：
 
 ### Docker
 
@@ -118,15 +118,15 @@ podman run --rm -it \
   claw-code-dev
 ```
 
-Then, for example:
+然后，例如：
 
 ```bash
 cargo run -p rusty-claude-cli -- prompt "summarize /repo"
 ```
 
-## Notes
+## 说明
 
-- Docker and Podman use the same checked-in `Containerfile`.
-- The `:Z` suffix in the Podman examples is for SELinux relabeling; keep it on Fedora/RHEL-class hosts.
-- Running with `CARGO_TARGET_DIR=/tmp/claw-target` avoids leaving container-owned `target/` artifacts in your bind-mounted checkout.
-- For non-container local development, keep using [`../USAGE.md`](../USAGE.md) and [`../rust/README.md`](../rust/README.md).
+- Docker 和 Podman 共用同一个纳入版本控制的 `Containerfile`。
+- Podman 示例中的 `:Z` 后缀用于 SELinux 重新标记；在 Fedora/RHEL 这类主机上请保留它。
+- 使用 `CARGO_TARGET_DIR=/tmp/claw-target` 可以避免在 bind mount 的检出目录里留下由容器拥有的 `target/` 产物。
+- 如果不是在容器中进行本地开发，继续参考 [`../USAGE.md`](../USAGE.md) 和 [`../rust/README.md`](../rust/README.md)。
